@@ -1,79 +1,79 @@
 import pygame as pg
 import sys
-import numpy as np
-from objects import Object
+from object import Object
+from vector import Vector
+from camera import Camera
+from settings import FOV, SCREEN_WIDTH, SCREEN_HEIGHT
 
 class Simulation:
     def __init__(self):
         pg.init()
-        self.win = pg.display.set_mode((800, 600))
+        self.win = pg.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock = pg.time.Clock()
-        self.simulation_objects = []
+        self.obj = []
         self.dt = 1
-        self.scrolling = False
-        self.mouse_origin = pg.mouse.get_pos()
-        self.trail_surface = pg.Surface((800, 600))
-
-        self.PARTICLE_EVENT = pg.USEREVENT + 1
-        pg.time.set_timer(self.PARTICLE_EVENT, 20)
-
-        obj1 = Object(self,
-                      mass=100,
-                      velocity=np.array([-2.1, 0.0]),
-                      acceleration=np.array([0.0, 0.0]),
-                      pos=np.array([400.0, 100.0]),
-                      radius=5.0,
-                      colour='blue')
-
-        obj2 = Object(self,
-                      mass=500.0,
-                      velocity=np.array([-0.2, 0.3]),
-                      acceleration=np.array([0.0, 0.0]),
-                      pos=np.array([400.0, 300.0]),
-                      radius=20.0,
-                      colour='red')
+        self.light = Vector(30, 50, 50)
+        self.camera = Camera(sim=self,
+                             FOV=FOV,
+                             pos=Vector(),
+                             cam_angle_x=0,
+                             cam_angle_y=0)
         
-        obj3 = Object(self,
-                      mass=230.0,
-                      velocity=np.array([-1.0, 0.0]),
-                      acceleration=np.array([0.0, 0.0]),
-                      pos=np.array([500.0, 30.0]),
-                      radius=17.0,
-                      colour='green')
+        s1 = Object(sim=self,
+                    mass=0,
+                    r=3,
+                    pos=Vector(1, 0, 3),
+                    col=(14, 209,69),
+                    vel=Vector(),
+                    acc=Vector(),
+                    id=0)
         
-        self.simulation_objects.append(obj1)
-        self.simulation_objects.append(obj2)
-        self.simulation_objects.append(obj3)
+        s2 = Object(sim=self,
+                    mass=0,
+                    r=3,
+                    pos=Vector(0, 0, 3),
+                    col=(63, 72, 204),
+                    vel=Vector(),
+                    acc=Vector(),
+                    id=1)
         
+        s3 = Object(sim=self,
+                    mass=0,
+                    r=3,
+                    pos=Vector(0, -1, 3),
+                    col=(255, 0, 0),
+                    vel=Vector(),
+                    acc=Vector(),
+                    id=2)
+        
+        self.obj.append(s1)
+        self.obj.append(s2)
+        self.obj.append(s3)
+        self.z_sort()
+
+    def z_sort(self):
+        for i in range(len(self.obj) - 1):
+            for j in range(len(self.obj) - 1):
+                if self.obj[j].pos.z < self.obj[j + 1].pos.z:
+                    t = self.obj[j]
+                    self.obj[j] = self.obj[j + 1]
+                    self.obj[j + 1] = t
+
     def draw(self):
-        self.win.fill('black')
-        for obj in self.simulation_objects:
-            obj.draw()
-
+        self.win.fill((0, 0, 0))
+        for obj in self.obj:
+            obj.draw(self.light)
+    
     def update(self):
-        for obj in self.simulation_objects:
-            obj.update_acceleration()
-            obj.update_movement()
-            self.dt = self.clock.tick(1000)
-            pg.display.set_caption(f'{self.clock.get_fps():.1f}')
-
-        if self.scrolling == True:
-            origin_x, origin_y = self.mouse_origin
-            mouse_x, mouse_y = pg.mouse.get_pos()
-            shift_x = mouse_x - origin_x
-            shift_y = mouse_y - origin_y
-
-            shift_vector = np.array([shift_x, shift_y])
-
-            for obj in self.simulation_objects:
-                obj.pos += shift_vector
-
-                for particle in obj.particle_emitter.particles:
-                    particle[0][0] += shift_x
-                    particle[0][1] += shift_y
-
-            self.mouse_origin = pg.mouse.get_pos()
+        self.z_sort()
+        for obj in self.obj:
+            obj.update()
         
+        self.dt = self.clock.tick(1000)
+        pg.display.set_caption(f'''FPS: {self.clock.get_fps():.1f} 
+                               CamAngleX: {self.camera.cam_angle_x:.1f} 
+                               CamAngleY: {self.camera.cam_angle_y:.1f}
+                               CamPos: {self.camera.pos}''')
         pg.display.flip()
 
     def check_event(self):
@@ -81,24 +81,14 @@ class Simulation:
             if event.type == pg.QUIT:
                 pg.quit()
                 sys.exit()
-            
-            if event.type == self.PARTICLE_EVENT:
-                for obj in self.simulation_objects:
-                    obj.particle_emitter.add()
 
-            if event.type == pg.MOUSEBUTTONDOWN:
-                self.scrolling = True
-                self.mouse_origin = pg.mouse.get_pos()
-                
-            if event.type == pg.MOUSEBUTTONUP:
-                self.scrolling = False
-                
+        self.camera.check_rotation()
+        
     def run(self):
         while True:
             self.check_event()
             self.draw()
             self.update()
-
 
 if __name__ == '__main__':
     s = Simulation()
